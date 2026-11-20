@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pre-owned Marketplace</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --card: #fff; --text: #1b1f24; --muted: #667085;
+      --accent: #128c4a; --accent-dark: #0e703b; --border: #e4e7ec;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #111418; --card: #1a1e24; --text: #eef0f3; --muted: #98a2b3; --border: #2a3039; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--text); }
+    header { padding: 28px 16px 12px; max-width: 1100px; margin: 0 auto; }
+    h1 { margin: 0 0 4px; font-size: 1.6rem; }
+    header p { margin: 0; color: var(--muted); }
+    .tools { max-width: 1100px; margin: 0 auto; padding: 8px 16px 16px; }
+    input[type=search] { width: 100%; max-width: 420px; padding: 10px 14px; font-size: 1rem;
+      border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); }
+    main { max-width: 1100px; margin: 0 auto; padding: 0 16px 48px;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      overflow: hidden; display: flex; flex-direction: column; }
+    .card:target { outline: 3px solid var(--accent); }
+    .hero { aspect-ratio: 4 / 3; width: 100%; object-fit: cover; background: var(--border); display: block; }
+    .thumbs { display: flex; gap: 6px; padding: 8px 12px 0; }
+    .thumbs img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; cursor: pointer;
+      border: 2px solid transparent; }
+    .thumbs img.active { border-color: var(--accent); }
+    .body { padding: 12px 14px 16px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .price { font-size: 1.25rem; font-weight: 700; }
+    .title { font-weight: 600; }
+    .desc { color: var(--muted); font-size: .93rem; white-space: pre-wrap; flex: 1; }
+    .date { color: var(--muted); font-size: .8rem; }
+    a.btn { margin-top: 8px; text-align: center; text-decoration: none; background: var(--accent);
+      color: #fff; padding: 10px; border-radius: 10px; font-weight: 600; }
+    a.btn:hover { background: var(--accent-dark); }
+    .empty { grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 48px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Pre-owned Marketplace</h1>
+    <p>Ads posted by sellers straight from WhatsApp.</p>
+  </header>
+  <div class="tools"><input id="q" type="search" placeholder="Search ads…" aria-label="Search ads" /></div>
+  <main id="grid"><div class="empty">Loading…</div></main>
+
+  <script>
+    const grid = document.getElementById('grid');
+    const q = document.getElementById('q');
+    let ads = [];
+
+    const fmt = (n, cur) => {
+      try { return new Intl.NumberFormat('en-IN', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n); }
+      catch { return cur + ' ' + n; }
+    };
+
+    function el(tag, props = {}, ...children) {
+      const e = document.createElement(tag);
+      Object.assign(e, props);
+      for (const c of children) e.append(c);
+      return e;
+    }
+
+    function card(ad) {
+      const hero = el('img', { className: 'hero', src: ad.images[0] || '', alt: ad.title, loading: 'lazy' });
+      const c = el('article', { className: 'card', id: 'ad-' + ad.id }, hero);
+
+      if (ad.images.length > 1) {
+        const thumbs = el('div', { className: 'thumbs' });
+        ad.images.forEach((src, i) => {
+          const t = el('img', { src, alt: '', loading: 'lazy', className: i === 0 ? 'active' : '' });
+          t.addEventListener('click', () => {
+            hero.src = src;
+            thumbs.querySelectorAll('img').forEach((x) => x.classList.remove('active'));
+            t.classList.add('active');
+          });
+          thumbs.append(t);
+        });
+        c.append(thumbs);
+      }
+
+      // textContent only (no innerHTML): ad text is user-provided and must never be parsed as HTML
+      const link = el('a', { className: 'btn', href: ad.contactUrl, target: '_blank', rel: 'noopener noreferrer' }, 'Chat with seller on WhatsApp');
+      c.append(el('div', { className: 'body' },
+        el('div', { className: 'price' }, fmt(ad.price, ad.currency)),
+        el('div', { className: 'title' }, ad.title),
+        el('div', { className: 'desc' }, ad.description),
+        el('div', { className: 'date' }, new Date(ad.createdAt).toLocaleDateString()),
+        link));
+      return c;
+    }
+
+    function render() {
+      const term = q.value.trim().toLowerCase();
+      const list = ads.filter((a) => !term || (a.title + ' ' + a.description).toLowerCase().includes(term));
+      grid.replaceChildren(...(list.length ? list.map(card) : [el('div', { className: 'empty' }, 'No ads found.')]));
+      if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
+    }
+
+    q.addEventListener('input', render);
+    fetch('/api/ads').then((r) => r.json()).then((d) => { ads = d; render(); })
+      .catch(() => { grid.replaceChildren(el('div', { className: 'empty' }, 'Could not load ads.')); });
+  </script>
+</body>
+</html>
